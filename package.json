@@ -15,6 +15,7 @@
     "ethers": "^6.12.1",
     "fs": "^0.0.1-security",
     "inquirer": "^9.2.22",
+    "jszip": "^3.10.1",
     "kubo-rpc-client": "^4.1.1",
     "path": "^0.12.7"
   },

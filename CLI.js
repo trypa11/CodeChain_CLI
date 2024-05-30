@@ -5,8 +5,9 @@ import { create } from 'kubo-rpc-client';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import CodeChain from './artifacts/contracts/CodeChain.sol/CodeChain.json' assert { type: 'json' };
-import { readdirSync, statSync, readFileSync } from 'fs';
+import { readdirSync, statSync, readFileSync,writeFileSync} from 'fs';
 import { join, relative, sep, basename } from 'path';
+import JSZip from 'jszip';
 
 const program = new Command();
 const ipfsClient = create({ host: '127.0.0.1', port: 5001, protocol: 'http' });
@@ -59,7 +60,9 @@ const handleUpload = async () => {
             message: 'Enter the local path of the folder to upload:'
         }
     ]);
-
+    //create a parent directory with unique name
+    const parent = Math.random().toString(36).substring(7);
+    await ipfsClient.files.mkdir(`/${parent}`);
 
     // Read the directory recursively
     const readDirectory = (directoryPath) => {
@@ -96,18 +99,16 @@ const handleUpload = async () => {
         const file = filesArray[i];
         const relativePath = relative(folderPath, file);
         const dirPath = directoryStructure[relativePath];
-
+    
         // Add the file to IPFS under the correct directory
         const content = readFileSync(file);
-        await ipfsClient.files.write(`/${dirPath}/${basename(file)}`, content, { create: true, parents: true });
+        await ipfsClient.files.write(`/${parent}/${dirPath}/${basename(file)}`, content, { create: true, parents: true });
     }
-
+    
     // Get the IPFS hash of the local parent directory
-    const parentDir = directoryStructure[relative(folderPath, filesArray[0])];
-    const ipfsHash = await ipfsClient.files.stat(`/${parentDir}`);
+    const ipfsHash = await ipfsClient.files.stat(`/${parent}`);
     CommitIPFSHash = ipfsHash.cid.toString();
-
-
+    
     console.log('IPFS Hash:', ipfsHash.cid.toString());
 };
 
@@ -292,6 +293,7 @@ const approvePullRequest = async () => {
 
 const clone = async () => {
     await authenticate();
+
     try {
         const { repoName, branchName } = await inquirer.prompt([
             {
@@ -305,10 +307,12 @@ const clone = async () => {
                 message: 'Enter the name of the branch:'
             }
         ]);
+
         if (!repoName) {
             console.error('Repository name is required');
             return;
         }
+
         if (!branchName) {
             console.error('Branch name is required');
             return;
@@ -317,14 +321,38 @@ const clone = async () => {
         const hash = await contract.getLatestIpfsHash(repoName, branchName);
         console.log('Latest commit IPFS hash:', hash);
 
-        for await (const file of ipfsClient.get(hash,{archive: true, compress: true})) {
-            console.log(file.path);
-        }
-        
+        const zip = new JSZip();
+        const folder = zip.folder(repoName);
+        await downloadDir(hash, folder);
+
+        const content = await zip.generateAsync({ type: 'nodebuffer' });
+        writeFileSync(`${repoName}.zip`, content);
+        console.log(`Repository ${repoName} has been successfully downloaded and saved as ${repoName}.zip`);
+
     } catch (error) {
         console.error('Error downloading folder:', error);
     }
 };
+
+const downloadDir = async (hash, zipFolder) => {
+    const files = await ipfsClient.ls(hash);
+
+    for await (const file of files) {
+        if (file.type === 'file') {
+            const fileStream = ipfsClient.cat(file.cid);
+            const chunks = [];
+            for await (const chunk of fileStream) {
+                chunks.push(chunk);
+            }
+            const fileData = Buffer.concat(chunks);
+            zipFolder.file(file.name, fileData);
+        } else if (file.type === 'dir') {
+            const subFolder = zipFolder.folder(file.name);
+            await downloadDir(file.cid, subFolder);
+        }
+    }
+};
+
 const getCommit = async () => {
     await authenticate();
     const { repoName, commitId } = await inquirer.prompt([
