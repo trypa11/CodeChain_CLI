@@ -4,10 +4,11 @@ import { ethers } from 'ethers';
 import { create } from 'kubo-rpc-client';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-import CodeChain from './artifacts/contracts/CodeChain.sol/CodeChain.json' assert { type: 'json' };
+const CodeChain = JSON.parse(readFileSync('./artifacts/contracts/CodeChain.sol/CodeChain.json', 'utf8'));
 import { readdirSync, statSync, readFileSync,writeFileSync} from 'fs';
 import { join, relative, sep, basename } from 'path';
 import JSZip from 'jszip';
+import figlet from 'figlet';
 
 const program = new Command();
 const ipfsClient = create({ host: '127.0.0.1', port: 5001, protocol: 'http' });
@@ -19,7 +20,10 @@ let CommitIPFSHash;
 let wallet;
 let signer;
 
+
+
 async function authenticate() {
+    await figletCodeChain();
     const { privateKey } = await inquirer.prompt([
         {
             type: 'input',
@@ -37,15 +41,16 @@ async function authenticate() {
 }
 const handleInit = async () => {
     await authenticate();
-    const { repoName } = await inquirer.prompt([
+    const { repoName,descr } = await inquirer.prompt([
         {
             type: 'input',
             name: 'repoName',
             message: 'Enter the name of the repository'
         }
+        
     ]);
     try {
-        await contract.connect(signer).createRepository(repoName);
+        await contract.createRepository(repoName);
         console.log('Created repository:', repoName);
     } catch (error) {
         console.error('Error initializing contract:', error);
@@ -239,7 +244,7 @@ const createBranch = async () => {
 };
 const createPullRequest = async () => {
     await authenticate();
-    const { repoName, fromBranch, toBranch, commitId } = await inquirer.prompt([
+    const { repoName, fromBranch, toBranch} = await inquirer.prompt([
         {
             type: 'input',
             name: 'repoName',
@@ -255,14 +260,9 @@ const createPullRequest = async () => {
             name: 'toBranch',
             message: 'Enter the name of the to branch:'
         },
-        {
-            type: 'input',
-            name: 'commitId',
-            message: 'Enter the commit id:'
-        }
     ]);
     try {
-        await contract.createPullRequest(repoName, fromBranch, toBranch, commitId);
+        await contract.createPullRequest(repoName, fromBranch, toBranch);
         console.log('Created pull request for repository:', repoName);
     } catch (error) {
         console.error('Error creating pull request:', error);
@@ -448,6 +448,62 @@ const getActivePullRequests = async () => {
         console.error('Error fetching active pull requests:', error);
     }
 };
+const getBalance = async () => {
+    await authenticate();
+    try {   
+        const balance = await provider.getBalance(account);
+        console.log('Balance:', balance);
+    } catch (error) {
+        console.error('Error fetching balance:', error);
+    }
+};
+//create a function that set the description of the repository
+const setRepoDescription = async () => {
+    await authenticate();
+    const { repoName, descr } = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'repoName',
+            message: 'Enter the name of the repository'
+        },
+        {
+            type: 'input',
+            name: 'descr',
+            message: 'Enter the description of the repository'
+        }
+    ]);
+    try {
+        await contract.setRepoDescription(repoName, descr);
+        console.log('Description set for repository:', repoName);
+    } catch (error) {
+        console.error('Error setting description:', error);
+    }
+};
+//create a function that use figlet for codechain
+const figletCodeChain = async () => {
+    await figlet('CodeChain',{ font: 'Doom' }, (err, data) => {
+        if (err) {
+            console.log('Error loading figlet');
+            return;
+        }
+        console.log(data);
+    }
+    );
+};
+
+const logoCodeChain = figlet.textSync('CodeChain', {
+    font: 'Doom',
+    horizontalLayout: 'default',
+    verticalLayout: 'default'
+});
+
+console.log(logoCodeChain);
+
+program 
+    .version('0.0.1')
+    .name('CodeChain')
+    .description('CodeChain:A decentralized code collaboration platform');
+
 
 
 program
@@ -498,6 +554,14 @@ program
     .description('Clone a repository')
     .action(clone);
 program
+    .command('balance')
+    .description('Get balance')
+    .action(getBalance);
+program
+    .command('repo-descr')
+    .description('Set the description of a repository')
+    .action(setRepoDescription);
+program
     .command('get-commit')
     .description('Get commit details')
     .action(getCommit);
@@ -518,5 +582,9 @@ program
     .description('Get active pull requests for a repository')
     .action(getActivePullRequests);
 
+
+if (!process.argv.slice(1).length) {
+    program.outputHelp();
+}
 
 program.parse(process.argv);

@@ -13,6 +13,7 @@
   "dependencies": {
     "commander": "^12.1.0",
     "ethers": "^6.12.1",
+    "figlet": "^1.7.0",
     "fs": "^0.0.1-security",
     "inquirer": "^9.2.22",
     "jszip": "^3.10.1",
@@ -20,6 +21,6 @@
     "path": "^0.12.7"
   },
   "bin": {
-    "cc": "./CLI.js"
+    "codechain": "./CLI.js"
   }
 }
