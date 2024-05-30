@@ -1,0 +1,24 @@
+{
+  "name": "codechain_cli",
+  "version": "1.0.0",
+  "description": "",
+  "main": "CLI.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "ethers": "^6.12.1",
+    "fs": "^0.0.1-security",
+    "inquirer": "^9.2.22",
+    "kubo-rpc-client": "^4.1.1",
+    "path": "^0.12.7"
+  },
+  "bin": {
+    "cc": "./CLI.js"
+  }
+}
