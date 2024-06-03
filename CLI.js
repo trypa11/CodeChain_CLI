@@ -4,7 +4,9 @@ import { ethers } from 'ethers';
 import { create } from 'kubo-rpc-client';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-const CodeChain = JSON.parse(readFileSync('./artifacts/contracts/CodeChain.sol/CodeChain.json', 'utf8'));
+//if you want to hide the warning but it does not work globally
+//const CodeChain = JSON.parse(readFileSync('./artifacts/contracts/CodeChain.sol/CodeChain.json', 'utf8'));
+import CodeChain from './artifacts/contracts/CodeChain.sol/CodeChain.json'assert { type: "json" };
 import { readdirSync, statSync, readFileSync,writeFileSync} from 'fs';
 import { join, relative, sep, basename } from 'path';
 import JSZip from 'jszip';
@@ -23,7 +25,6 @@ let signer;
 
 
 async function authenticate() {
-    await figletCodeChain();
     const { privateKey } = await inquirer.prompt([
         {
             type: 'input',
@@ -144,7 +145,8 @@ const commit = async () => {
             return;
         }
         await contract.commit(repoName, branchName, message, CommitIPFSHash);
-        console.log('Commit made to repository:', repoName);
+        const id = (await contract.getLatestCommitId(repoName, branchName)).toString();
+        console.log('Commit made to repository:', repoName,'with id:',id);
     } catch (error) {
         console.error('Error making commit:', error);
     }
@@ -152,7 +154,7 @@ const commit = async () => {
 
 const publish = async () => {
     await authenticate();
-    const repoName = await inquirer.prompt([
+    const {repoName} = await inquirer.prompt([
         {
             type: 'input',
             name: 'repoName',
@@ -160,7 +162,7 @@ const publish = async () => {
         }
     ]);
     try {
-        await contract.getRepositoryPublic(repoName);
+        await contract.setRepositoryPublic(repoName);
     } catch (error) {
         console.error('Error getting public repository:', error);
     }
@@ -263,7 +265,8 @@ const createPullRequest = async () => {
     ]);
     try {
         await contract.createPullRequest(repoName, fromBranch, toBranch);
-        console.log('Created pull request for repository:', repoName);
+        const id = (await contract.getLatestPullRequestId()).toString();
+        console.log('Created pull request for repository:', repoName,'with id:',id);
     } catch (error) {
         console.error('Error creating pull request:', error);
     }
@@ -479,17 +482,17 @@ const setRepoDescription = async () => {
         console.error('Error setting description:', error);
     }
 };
-//create a function that use figlet for codechain
-const figletCodeChain = async () => {
-    await figlet('CodeChain',{ font: 'Doom' }, (err, data) => {
-        if (err) {
-            console.log('Error loading figlet');
-            return;
-        }
-        console.log(data);
+const myRepositories = async () => {
+    await authenticate();
+    try {
+        const repoNames = await contract.getCollaboratorRepositories(account);
+        console.log('Repositories where user is a collaborator:', repoNames);
+    } catch (error) {
+        console.error('Error getting collaborator repositories:', error);
     }
-    );
 };
+        
+
 
 const logoCodeChain = figlet.textSync('CodeChain', {
     font: 'Doom',
@@ -515,7 +518,10 @@ program
     .command('init')
     .description('Initialize a new repository')
     .action(handleInit);
-
+program
+    .command('my-repo')
+    .description('Get the repositories where you are a collaborator')
+    .action(myRepositories);
 program
     .command('upload')
     .description('Upload a folder to IPFS')
